@@ -390,6 +390,7 @@
     background: rgba(227,167,43,0.14);
   }
   .radio-pill input{ accent-color: var(--amber); }
+  .radio-pill:has(input:disabled){ opacity: 0.5; cursor: not-allowed; }
 
   #address-fields{ margin-top: 16px; }
   #address-fields[hidden]{ display:none; }
@@ -539,9 +540,9 @@
         </div>
         <div class="radio-group">
           <label class="radio-pill"><input type="radio" name="delivery" value="Abholung" checked> Selbst abholen</label>
-          <label class="radio-pill"><input type="radio" name="delivery" value="Versand"> Versand</label>
+          <label class="radio-pill"><input type="radio" name="delivery" value="Versand" id="versand-radio"> Versand</label>
         </div>
-        <p class="price-note" style="margin-top:8px;">Versand nur innerhalb Deutschlands</p>
+        <p class="price-note" id="versand-hint" style="margin-top:8px;">Versand ab 6 Gläsern möglich, nur innerhalb Deutschlands</p>
       </div>
 
       <form class="form-card" id="order-form">
@@ -611,11 +612,15 @@
   document.getElementById('year').textContent = new Date().getFullYear();
 
   const PRICE = 7.5;
+  const MIN_QTY_FOR_SHIPPING = 6;
   const qtyInput = document.getElementById('qty-input');
   const subtotalEl = document.getElementById('subtotal');
   const submitTotalEl = document.getElementById('submit-total');
   const shippingRow = document.getElementById('shipping-row');
   const shippingValueEl = document.getElementById('shipping-value');
+  const versandRadio = document.getElementById('versand-radio');
+  const versandHint = document.getElementById('versand-hint');
+  const addressFields = document.getElementById('address-fields');
   const fmt = n => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 
   function getShippingCost(qty){
@@ -634,6 +639,19 @@
     if (isNaN(qty) || qty < 1) qty = 1;
     if (qty > 10) qty = 10;
     qtyInput.value = qty;
+
+    const canShip = qty >= MIN_QTY_FOR_SHIPPING;
+    versandRadio.disabled = !canShip;
+    versandHint.textContent = canShip
+      ? 'Versand innerhalb Deutschlands'
+      : `Versand ab ${MIN_QTY_FOR_SHIPPING} Gläsern möglich, nur innerhalb Deutschlands`;
+
+    if (!canShip && versandRadio.checked) {
+      versandRadio.checked = false;
+      document.querySelector('input[name="delivery"][value="Abholung"]').checked = true;
+      addressFields.hidden = true;
+      ['street','zip','city'].forEach(id => document.getElementById(id).required = false);
+    }
 
     const subtotal = qty * PRICE;
     const isShipping = currentDelivery() === 'Versand';
@@ -656,7 +674,6 @@
   qtyInput.addEventListener('input', updateTotals);
   updateTotals();
 
-  const addressFields = document.getElementById('address-fields');
   const deliveryRadios = document.querySelectorAll('input[name="delivery"]');
   deliveryRadios.forEach(r => r.addEventListener('change', () => {
     const isShipping = currentDelivery() === 'Versand';
